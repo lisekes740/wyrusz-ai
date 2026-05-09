@@ -86,7 +86,7 @@ export default function MapSelector({ continent, countries, selected, onSelect }
         />
         {search && (
           <button type="button"
-            onClick={() => { setSearch(''); setDropOpen(false); onSelect(''); }}
+            onClick={() => { setSearch(''); setDropOpen(false); onSelect([]); }}
             className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 transition-colors z-10">
             <X size={14} />
           </button>
