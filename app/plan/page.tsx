@@ -155,6 +155,8 @@ function BudgetSlider({ label, name, value, onChange }: { label:string; name:str
 
 export default function PlanTripPage() {
   const [step, setStep] = useState(1);
+  const [planResult, setPlanResult] = useState('');
+  const [planError, setPlanError] = useState('');
   const [fd, setFd] = useState<FormData>({
     continent:'', country:[], city:'',
     dateType:'dates', startDate:'', endDate:'',
@@ -169,9 +171,31 @@ export default function PlanTripPage() {
   const toggleArr = (field: 'transport'|'tripTypes', v: string) =>
     set({ [field]: fd[field].includes(v) ? fd[field].filter(x=>x!==v) : [...fd[field], v] });
 
-  const nextStep = () => {
+  const nextStep = async () => {
     if (step === 6) {
-      console.log("Wysłano dane z formularza do wygenerowania planu:", fd);
+      // Move to loading screen immediately
+      setStep(7);
+      setPlanResult('');
+      setPlanError('');
+      try {
+        const res = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(fd),
+        });
+        const data = await res.json();
+        if (data.plan) {
+          setPlanResult(data.plan);
+          setStep(8);
+        } else {
+          setPlanError(data.error || 'Nieznany błąd API');
+          setStep(8);
+        }
+      } catch (err) {
+        setPlanError('Wystąpił błąd połączenia z serwerem.');
+        setStep(8);
+      }
+      return;
     }
     if (step < 7) setStep(s=>s+1);
   };
@@ -467,9 +491,59 @@ export default function PlanTripPage() {
                 <h1 className="text-4xl font-bold mb-4 bg-clip-text text-transparent bg-gradient-to-r from-emerald-600 to-teal-600">wyruszAI komponuje Twój plan...</h1>
                 <p className="text-lg text-slate-600 max-w-xl">Analizujemy Twoje preferencje i dobieramy idealne miejsca, restauracje i trasy.</p>
                 <div className="mt-10 px-8 py-4 bg-white/60 backdrop-blur-md rounded-2xl border-2 border-emerald-100 text-slate-700 font-medium inline-flex items-center gap-3">
-                  <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"/>Gemini AI pracuje dla Ciebie...
+                  <span className="w-3 h-3 rounded-full bg-emerald-500 animate-pulse"/>OpenAI GPT-4o pracuje dla Ciebie...
                 </div>
               </div>
+            </div>
+
+            {/* S8: Plan Result */}
+            <div className={step===8?'relative':'hidden'}>
+              {planError ? (
+                <div className="text-center py-20">
+                  <div className="text-6xl mb-6">😢</div>
+                  <h1 className="text-3xl font-bold text-slate-800 mb-4">Coś poszło nie tak</h1>
+                  <p className="text-red-600 bg-red-50 border border-red-200 rounded-2xl px-6 py-4 inline-block mb-8">{planError}</p>
+                  <br/>
+                  <button type="button" onClick={() => { setStep(6); setPlanError(''); }}
+                    className="px-8 py-4 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition-colors">
+                    ← Wróć i spróbuj ponownie
+                  </button>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-14 h-14 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-lg border-2 border-white">
+                      <Sparkles className="text-white" size={24}/>
+                    </div>
+                    <div>
+                      <h1 className="text-3xl sm:text-4xl font-bold text-slate-800">Twój Plan Podróży</h1>
+                      <p className="text-slate-500 text-sm mt-1">Wygenerowany przez wyruszAI • GPT-4o mini</p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-3xl border-2 border-slate-100 shadow-sm p-6 sm:p-10 prose prose-slate max-w-none">
+                    {planResult.split('\n').map((line, i) => {
+                      if (line.startsWith('## ')) return <h2 key={i} className="text-2xl font-bold text-slate-800 mt-8 mb-3 pb-2 border-b-2 border-emerald-100">{line.replace('## ','')}</h2>;
+                      if (line.startsWith('### ')) return <h3 key={i} className="text-lg font-bold text-emerald-700 mt-6 mb-2">{line.replace('### ','')}</h3>;
+                      if (line.startsWith('**') && line.endsWith('**')) return <p key={i} className="font-bold text-slate-800 mt-3">{line.replace(/\*\*/g,'')}</p>;
+                      if (line.startsWith('- ') || line.startsWith('* ')) return <li key={i} className="text-slate-700 ml-4 mb-1 list-disc">{line.replace(/^[-*] /,'')}</li>;
+                      if (line.trim() === '') return <div key={i} className="h-2"/>;
+                      return <p key={i} className="text-slate-700 leading-relaxed mb-2">{line}</p>;
+                    })}
+                  </div>
+
+                  <div className="mt-8 flex flex-col sm:flex-row gap-4">
+                    <button type="button" onClick={() => { setStep(1); setPlanResult(''); setPlanError(''); }}
+                      className="flex-1 px-8 py-4 border-2 border-slate-200 text-slate-700 rounded-xl font-bold hover:bg-slate-50 transition-colors">
+                      🔄 Zaplanuj nową podróż
+                    </button>
+                    <button type="button" onClick={() => window.print()}
+                      className="flex-1 px-8 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white rounded-xl font-bold shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:scale-[1.02] transition-all">
+                      💾 Zapisz Plan
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Navigation */}
